@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Research Assistant</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f0f2f6; display: flex; height: 100vh; }
+        #sidebar { width: 300px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        #main { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; }
+        h1, h2 { color: #31333F; }
+        .upload-area { border: 2px dashed #cccccc; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 20px; cursor: pointer; }
+        .upload-area:hover { border-color: #ff4b4b; }
+        button { background-color: #ff4b4b; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+        button:hover { background-color: #ff3333; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #chat-container { flex-grow: 1; overflow-y: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; max-width: 80%; }
+        .user-message { background-color: #e6f3ff; margin-left: auto; border-bottom-right-radius: 0; }
+        .ai-message { background-color: #f0f0f0; margin-right: auto; border-bottom-left-radius: 0; }
+        #input-area { display: flex; gap: 10px; }
+        input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #cccccc; border-radius: 4px; font-size: 16px; }
+        #status { margin-top: 10px; font-size: 14px; color: #666; }
+        #footer { margin-top: auto; padding-top: 20px; border-top: 1px solid #eee; font-size: 14px; color: #666; }
+        a { color: #ff4b4b; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h2>📚 AI Research Assistant</h2>
+        <p>Upload a document and ask questions about its content.</p>
+        
+        <input type="file" id="file-input" accept=".pdf,.txt" style="display: none;">
+        <div class="upload-area" onclick="document.getElementById('file-input').click()">
+            <p>Click to browse PDF or TXT file</p>
+        </div>
+        <p id="file-name"></p>
+        
+        <button id="process-btn" disabled>Process Document</button>
+        <div id="status"></div>
+
+        <div id="footer">
+            <strong>Developed by Saif Azzan</strong><br>
+            📧 <a href="mailto:dev.saifazzan@gmail.com">dev.saifazzan@gmail.com</a><br>
+            🐙 <a href="https://github.com/devsaifazzan" target="_blank">GitHub devsaifazzan</a>
+        </div>
+    </div>
+
+    <div id="main">
+        <h1>Chat with your Document</h1>
+        <div id="chat-container">
+            <div class="message ai-message">Please upload and process a document in the sidebar to start chatting.</div>
+        </div>
+        <div id="input-area">
+            <input type="text" id="chat-input" placeholder="Ask a question about the document..." disabled onkeypress="if(event.key === 'Enter') sendMessage()">
+            <button id="send-btn" disabled onclick="sendMessage()" style="width: auto;">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let documentText = "";
+        let chatHistory = [];
+
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            if(e.target.files.length > 0) {
+                document.getElementById('file-name').innerText = e.target.files[0].name;
+                document.getElementById('process-btn').disabled = false;
+            }
+        });
+
+        document.getElementById('process-btn').addEventListener('click', async function() {
+            const fileInput = document.getElementById('file-input');
+            if(fileInput.files.length === 0) return;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            const statusDiv = document.getElementById('status');
+            const processBtn = document.getElementById('process-btn');
+            
+            processBtn.disabled = true;
+            statusDiv.innerText = "Processing document... Please wait.";
+            statusDiv.style.color = "orange";
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if(response.ok) {
+                    documentText = data.text;
+                    statusDiv.innerText = "Document processed successfully!";
+                    statusDiv.style.color = "green";
+                    document.getElementById('chat-input').disabled = false;
+                    document.getElementById('send-btn').disabled = false;
+                    
+                    // Reset chat
+                    chatHistory = [];
+                    document.getElementById('chat-container').innerHTML = '<div class="message ai-message">Document ready! What would you like to know?</div>';
+                } else {
+                    statusDiv.innerText = "Error: " + data.error;
+                    statusDiv.style.color = "red";
+                }
+            } catch (err) {
+                statusDiv.innerText = "Error: " + err.message;
+                statusDiv.style.color = "red";
+            } finally {
+                processBtn.disabled = false;
+            }
+        });
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if(!message || !documentText) return;
+            
+            appendMessage('user', message);
+            input.value = '';
+            input.disabled = true;
+            document.getElementById('send-btn').disabled = true;
+            
+            const chatContainer = document.getElementById('chat-container');
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message ai-message';
+            typingDiv.innerText = 'Thinking...';
+            chatContainer.appendChild(typingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        document_text: documentText,
+                        query: message,
+                        chat_history: chatHistory
+                    })
+                });
+                
+                const data = await response.json();
+                typingDiv.remove();
+                
+                if(response.ok) {
+                    appendMessage('assistant', data.answer);
+                    chatHistory.push({ role: 'user', content: message });
+                    chatHistory.push({ role: 'assistant', content: data.answer });
+                } else {
+                    appendMessage('assistant', 'Error: ' + data.error);
+                }
+            } catch(err) {
+                typingDiv.remove();
+                appendMessage('assistant', 'Error: ' + err.message);
+            } finally {
+                input.disabled = false;
+                document.getElementById('send-btn').disabled = false;
+                input.focus();
+            }
+        }
+
+        function appendMessage(role, text) {
+            const container = document.getElementById('chat-container');
+            const div = document.createElement('div');
+            div.className = `message ${role}-message`;
+            div.innerText = text;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+    </script>
+</body>
+</html>
