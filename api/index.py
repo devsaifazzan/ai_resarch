@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse, FileResponse
+from typing import List
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -29,28 +30,31 @@ class ChatRequest(BaseModel):
     chat_history: list
 
 @app.post("/api/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: List[UploadFile] = File(...)):
     try:
-        file_extension = os.path.splitext(file.filename)[1].lower()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
-            content = await file.read()
-            temp_file.write(content)
-            temp_file_path = temp_file.name
+        combined_text = ""
+        for f in file:
+            file_extension = os.path.splitext(f.filename)[1].lower()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
+                content = await f.read()
+                temp_file.write(content)
+                temp_file_path = temp_file.name
 
-        if file_extension == '.pdf':
-            loader = PyMuPDFLoader(temp_file_path)
-            documents = loader.load()
-        elif file_extension == '.txt':
-            loader = TextLoader(temp_file_path, encoding='utf-8')
-            documents = loader.load()
-        else:
-            return JSONResponse(status_code=400, content={"error": "Unsupported file format"})
+            if file_extension == '.pdf':
+                loader = PyMuPDFLoader(temp_file_path)
+                documents = loader.load()
+            elif file_extension == '.txt':
+                loader = TextLoader(temp_file_path, encoding='utf-8')
+                documents = loader.load()
+            else:
+                return JSONResponse(status_code=400, content={"error": f"Unsupported file format: {f.filename}"})
 
-        text_content = "\n".join([doc.page_content for doc in documents])
-        os.remove(temp_file_path)
+            file_text = "\n".join([doc.page_content for doc in documents])
+            combined_text += f"\n--- Start of {f.filename} ---\n{file_text}\n--- End of {f.filename} ---\n"
+            os.remove(temp_file_path)
 
         # For stateless, we return the text to the client
-        return {"text": text_content[:200000]} # Increased to 200k chars for larger documents
+        return {"text": combined_text[:200000]} # Increased to 200k chars for larger documents
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
@@ -82,6 +86,26 @@ async def chat(request: ChatRequest):
         })
         
         return {"answer": response.content}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.post("/api/presentation")
+async def generate_presentation(request: ChatRequest):
+    try:
+        llm = ChatOpenAI(temperature=0.2, model="gpt-4o-mini")
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are an expert presentation generator. Create a structured slide-by-slide presentation summary based on the provided documents. Use clear slide numbers, titles, and bullet points. Make it well formatted.\n\nDocuments:\n{document_text}"),
+            ("user", "Please generate a presentation based on the uploaded files.")
+        ])
+        
+        chain = prompt | llm
+        
+        response = chain.invoke({
+            "document_text": request.document_text
+        })
+        
+        return {"presentation": response.content}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 

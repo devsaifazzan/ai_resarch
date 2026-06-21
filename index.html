@@ -6,20 +6,35 @@
     <title>AI Research Assistant</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f0f2f6; display: flex; height: 100vh; }
-        #sidebar { width: 300px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        #sidebar { width: 300px; background-color: #ffffff; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; z-index: 10; }
         #main { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; }
-        h1, h2 { color: #31333F; }
+        h1, h2 { color: #31333F; margin-top: 0; }
         .upload-area { border: 2px dashed #cccccc; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 20px; cursor: pointer; }
         .upload-area:hover { border-color: #ff4b4b; }
-        button { background-color: #ff4b4b; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+        button { background-color: #ff4b4b; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; transition: background-color 0.2s; }
         button:hover { background-color: #ff3333; }
         button:disabled { background-color: #cccccc; cursor: not-allowed; }
-        #chat-container { flex-grow: 1; overflow-y: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        .tabs { display: flex; margin-bottom: 20px; gap: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .tab-btn { background: transparent; color: #666; width: auto; padding: 8px 16px; font-weight: bold; border-radius: 20px; }
+        .tab-btn:hover { background: #f0f2f6; }
+        .tab-btn.active { background: #ff4b4b; color: white; }
+        
+        .tab-content { flex-grow: 1; display: none; flex-direction: column; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow-y: auto; }
+        .tab-content.active { display: flex; }
+
+        #chat-container { flex-grow: 1; overflow-y: auto; margin-bottom: 20px; }
         .message { margin-bottom: 15px; padding: 10px; border-radius: 8px; max-width: 80%; }
         .user-message { background-color: #e6f3ff; margin-left: auto; border-bottom-right-radius: 0; }
         .ai-message { background-color: #f0f0f0; margin-right: auto; border-bottom-left-radius: 0; }
         #input-area { display: flex; gap: 10px; }
         input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #cccccc; border-radius: 4px; font-size: 16px; }
+        
+        #file-list { list-style-type: none; padding: 0; }
+        #file-list li { background: #f8f9fa; margin-bottom: 10px; padding: 12px; border-radius: 6px; border: 1px solid #eee; display: flex; justify-content: space-between; }
+        
+        #presentation-content { line-height: 1.6; font-size: 16px; color: #333; white-space: pre-wrap; }
+        
         #status { margin-top: 10px; font-size: 14px; color: #666; }
         #footer { margin-top: auto; padding-top: 20px; border-top: 1px solid #eee; font-size: 14px; color: #666; }
         a { color: #ff4b4b; text-decoration: none; }
@@ -28,15 +43,15 @@
 <body>
     <div id="sidebar">
         <h2>📚 AI Research Assistant</h2>
-        <p>Upload a document and ask questions about its content.</p>
+        <p>Upload documents and ask questions about their content.</p>
         
-        <input type="file" id="file-input" accept=".pdf,.txt" style="display: none;">
+        <input type="file" id="file-input" accept=".pdf,.txt" multiple style="display: none;">
         <div class="upload-area" onclick="document.getElementById('file-input').click()">
-            <p>Click to browse PDF or TXT file</p>
+            <p>Click to browse PDF or TXT files</p>
         </div>
         <p id="file-name"></p>
         
-        <button id="process-btn" disabled>Process Document</button>
+        <button id="process-btn" disabled>Process Documents</button>
         <div id="status"></div>
 
         <div id="footer">
@@ -47,24 +62,65 @@
     </div>
 
     <div id="main">
-        <h1>Chat with your Document</h1>
-        <div id="chat-container">
-            <div class="message ai-message">Please upload and process a document in the sidebar to start chatting.</div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('chat')">💬 Chat</button>
+            <button class="tab-btn" onclick="switchTab('files')">📁 Files</button>
+            <button class="tab-btn" onclick="switchTab('presentation')">📊 Presentation</button>
         </div>
-        <div id="input-area">
-            <input type="text" id="chat-input" placeholder="Ask a question about the document..." disabled onkeypress="if(event.key === 'Enter') sendMessage()">
-            <button id="send-btn" disabled onclick="sendMessage()" style="width: auto;">Send</button>
+
+        <div id="tab-chat" class="tab-content active">
+            <div id="chat-container">
+                <div class="message ai-message">Please upload and process documents in the sidebar to start chatting.</div>
+            </div>
+            <div id="input-area">
+                <input type="text" id="chat-input" placeholder="Ask a question about the documents..." disabled onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button id="send-btn" disabled onclick="sendMessage()" style="width: auto;">Send</button>
+            </div>
+        </div>
+
+        <div id="tab-files" class="tab-content">
+            <h2>Uploaded Files</h2>
+            <p style="color: #666;">Here are the files currently loaded into the AI's memory:</p>
+            <ul id="file-list">
+                <li>No files uploaded yet.</li>
+            </ul>
+        </div>
+
+        <div id="tab-presentation" class="tab-content">
+            <h2>Presentation Generator</h2>
+            <p style="color: #666;">Automatically generate a structured slide-by-slide summary of your uploaded documents.</p>
+            <button id="generate-presentation-btn" disabled onclick="generatePresentation()" style="max-width: 300px; margin-bottom: 20px;">Generate Presentation</button>
+            <div id="presentation-content"></div>
         </div>
     </div>
 
     <script>
         let documentText = "";
         let chatHistory = [];
+        let uploadedFilesList = [];
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelector(`.tab-btn[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
 
         document.getElementById('file-input').addEventListener('change', function(e) {
-            if(e.target.files.length > 0) {
-                document.getElementById('file-name').innerText = e.target.files[0].name;
+            const fileCount = e.target.files.length;
+            if(fileCount > 0) {
+                if (fileCount === 1) {
+                    document.getElementById('file-name').innerText = e.target.files[0].name;
+                } else {
+                    document.getElementById('file-name').innerText = `${fileCount} files selected`;
+                }
                 document.getElementById('process-btn').disabled = false;
+                
+                uploadedFilesList = Array.from(e.target.files).map(f => ({
+                    name: f.name,
+                    size: (f.size / 1024 / 1024).toFixed(2) + ' MB'
+                }));
             }
         });
 
@@ -73,13 +129,15 @@
             if(fileInput.files.length === 0) return;
             
             const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('file', fileInput.files[i]);
+            }
             
             const statusDiv = document.getElementById('status');
             const processBtn = document.getElementById('process-btn');
             
             processBtn.disabled = true;
-            statusDiv.innerText = "Processing document... Please wait.";
+            statusDiv.innerText = "Processing documents... Please wait.";
             statusDiv.style.color = "orange";
             
             try {
@@ -92,14 +150,24 @@
                 
                 if(response.ok) {
                     documentText = data.text;
-                    statusDiv.innerText = "Document processed successfully!";
+                    statusDiv.innerText = "Documents processed successfully!";
                     statusDiv.style.color = "green";
+                    
                     document.getElementById('chat-input').disabled = false;
                     document.getElementById('send-btn').disabled = false;
+                    document.getElementById('generate-presentation-btn').disabled = false;
                     
                     // Reset chat
                     chatHistory = [];
-                    document.getElementById('chat-container').innerHTML = '<div class="message ai-message">Document ready! What would you like to know?</div>';
+                    document.getElementById('chat-container').innerHTML = '<div class="message ai-message">Documents ready! What would you like to know?</div>';
+                    
+                    // Update Files List
+                    const listHtml = uploadedFilesList.map(f => `<li><strong>${f.name}</strong> <span>${f.size}</span></li>`).join('');
+                    document.getElementById('file-list').innerHTML = listHtml;
+                    
+                    // Reset Presentation
+                    document.getElementById('presentation-content').innerHTML = '';
+                    
                 } else {
                     statusDiv.innerText = "Error: " + data.error;
                     statusDiv.style.color = "red";
@@ -167,6 +235,42 @@
             div.innerText = text;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
+        }
+
+        async function generatePresentation() {
+            if(!documentText) return;
+            
+            const btn = document.getElementById('generate-presentation-btn');
+            const content = document.getElementById('presentation-content');
+            
+            btn.disabled = true;
+            btn.innerText = "Generating Presentation...";
+            content.innerHTML = '<div style="color:orange;">Reading documents and drafting presentation... This might take a moment.</div>';
+            
+            try {
+                const response = await fetch('/api/presentation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        document_text: documentText,
+                        query: "", // Not needed
+                        chat_history: [] // Not needed
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if(response.ok) {
+                    content.innerText = data.presentation;
+                } else {
+                    content.innerHTML = '<div style="color:red;">Error: ' + data.error + '</div>';
+                }
+            } catch(err) {
+                content.innerHTML = '<div style="color:red;">Error: ' + err.message + '</div>';
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Regenerate Presentation";
+            }
         }
     </script>
 </body>
