@@ -154,14 +154,13 @@
                         combinedText += data.text + "\n";
                     } else {
                         let errorMsg = "Unknown error";
+                        const rawText = await response.text();
                         try {
-                            const errData = await response.json();
+                            const errData = JSON.parse(rawText);
                             errorMsg = errData.error || errorMsg;
                         } catch(e) {
-                            // If it's a Vercel HTML error like 413 Payload Too Large
-                            const rawText = await response.text();
                             if(rawText.includes("Request Entity Too Large") || response.status === 413) {
-                                errorMsg = "File is too large for Vercel's 4.5MB limit.";
+                                errorMsg = "File is too large! Vercel's free tier has a strict 4.5 MB limit per file.";
                             } else {
                                 errorMsg = rawText.substring(0, 100);
                             }
