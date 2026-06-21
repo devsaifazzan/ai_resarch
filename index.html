@@ -129,29 +129,53 @@
             const fileInput = document.getElementById('file-input');
             if(fileInput.files.length === 0) return;
             
-            const formData = new FormData();
-            for (let i = 0; i < fileInput.files.length; i++) {
-                formData.append('file', fileInput.files[i]);
-            }
-            
             const statusDiv = document.getElementById('status');
             const processBtn = document.getElementById('process-btn');
             
             processBtn.disabled = true;
-            statusDiv.innerText = "Processing documents... Please wait.";
             statusDiv.style.color = "orange";
             
             try {
-                const response = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+                let combinedText = "";
+                let hasError = false;
                 
-                const data = await response.json();
+                for (let i = 0; i < fileInput.files.length; i++) {
+                    statusDiv.innerText = `Processing document ${i+1} of ${fileInput.files.length}... Please wait.`;
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[i]);
+                    
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if(response.ok) {
+                        const data = await response.json();
+                        combinedText += data.text + "\n";
+                    } else {
+                        let errorMsg = "Unknown error";
+                        try {
+                            const errData = await response.json();
+                            errorMsg = errData.error || errorMsg;
+                        } catch(e) {
+                            // If it's a Vercel HTML error like 413 Payload Too Large
+                            const rawText = await response.text();
+                            if(rawText.includes("Request Entity Too Large") || response.status === 413) {
+                                errorMsg = "File is too large for Vercel's 4.5MB limit.";
+                            } else {
+                                errorMsg = rawText.substring(0, 100);
+                            }
+                        }
+                        statusDiv.innerText = `Error on file ${fileInput.files[i].name}: ${errorMsg}`;
+                        statusDiv.style.color = "red";
+                        hasError = true;
+                        break;
+                    }
+                }
                 
-                if(response.ok) {
-                    documentText = data.text;
-                    statusDiv.innerText = "Documents processed successfully!";
+                if(!hasError) {
+                    documentText = combinedText;
+                    statusDiv.innerText = "All documents processed successfully!";
                     statusDiv.style.color = "green";
                     
                     document.getElementById('chat-input').disabled = false;
@@ -175,10 +199,6 @@
                     document.getElementById('presentation-content').innerHTML = '';
                     document.getElementById('file-viewer-container').style.display = 'none';
                     document.getElementById('file-viewer').src = '';
-                    
-                } else {
-                    statusDiv.innerText = "Error: " + data.error;
-                    statusDiv.style.color = "red";
                 }
             } catch (err) {
                 statusDiv.innerText = "Error: " + err.message;
