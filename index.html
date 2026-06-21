@@ -140,9 +140,19 @@
                 let hasError = false;
                 
                 for (let i = 0; i < fileInput.files.length; i++) {
+                    const currentFile = fileInput.files[i];
+                    
+                    // Client-side validation for Vercel's 4.5MB limit
+                    if (currentFile.size > 4.5 * 1024 * 1024) {
+                        statusDiv.innerHTML = `<b>Upload Blocked:</b> The file <i>${currentFile.name}</i> is ${ (currentFile.size / 1024 / 1024).toFixed(2) } MB. <br><br><b>Why?</b> Vercel's free tier strictly limits individual file uploads to 4.5 MB. Please compress this PDF or upload smaller files.`;
+                        statusDiv.style.color = "red";
+                        hasError = true;
+                        break;
+                    }
+                    
                     statusDiv.innerText = `Processing document ${i+1} of ${fileInput.files.length}... Please wait.`;
                     const formData = new FormData();
-                    formData.append('file', fileInput.files[i]);
+                    formData.append('file', currentFile);
                     
                     const response = await fetch('/api/upload', {
                         method: 'POST',
