@@ -21,15 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve static files for local testing only if directory exists (Vercel handles this automatically)
-if os.path.isdir("public"):
-    app.mount("/public", StaticFiles(directory="public"), name="public")
-
-@app.get("/")
-async def read_index():
-    if os.path.exists('public/index.html'):
-        return FileResponse('public/index.html')
-    return JSONResponse(status_code=200, content={"message": "API is running. Frontend is served by Vercel."})
+# Static files are handled natively by Vercel.
 
 class ChatRequest(BaseModel):
     document_text: str
