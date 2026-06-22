@@ -7,7 +7,7 @@ from pydantic import BaseModel
 import tempfile
 import os
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
 
@@ -28,6 +28,7 @@ class ChatRequest(BaseModel):
     document_text: str
     query: str
     chat_history: list
+    api_key: str
 
 @app.post("/api/upload")
 async def upload_document(file: List[UploadFile] = File(...)):
@@ -61,7 +62,10 @@ async def upload_document(file: List[UploadFile] = File(...)):
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     try:
-        llm = ChatOpenAI(temperature=0, model="gpt-4o-mini")
+        if not request.api_key:
+            return JSONResponse(status_code=400, content={"error": "Gemini API Key is missing. Please provide it in the UI."})
+            
+        llm = ChatGoogleGenerativeAI(temperature=0, model="gemini-1.5-flash", google_api_key=request.api_key)
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful research assistant. Answer the user's questions based on the following document text. If the answer is not in the text, say you don't know.\n\nDocument Text:\n{document_text}"),
@@ -92,7 +96,10 @@ async def chat(request: ChatRequest):
 @app.post("/api/presentation")
 async def generate_presentation(request: ChatRequest):
     try:
-        llm = ChatOpenAI(temperature=0.2, model="gpt-4o-mini")
+        if not request.api_key:
+            return JSONResponse(status_code=400, content={"error": "Gemini API Key is missing. Please provide it in the UI."})
+            
+        llm = ChatGoogleGenerativeAI(temperature=0.2, model="gemini-1.5-flash", google_api_key=request.api_key)
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", "You are an expert presentation generator. Create a structured slide-by-slide presentation summary based on the provided documents. Use clear slide numbers, titles, and bullet points. Make it well formatted.\n\nDocuments:\n{document_text}"),

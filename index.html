@@ -15,7 +15,11 @@
         button:hover { background-color: #ff3333; }
         button:disabled { background-color: #cccccc; cursor: not-allowed; }
         
-        .tabs { display: flex; margin-bottom: 20px; gap: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .tabs-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .tabs { display: flex; gap: 10px; }
+        .api-key-container { display: flex; align-items: center; gap: 10px; }
+        .api-key-input { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; width: 250px; outline: none; }
+        .api-key-input:focus { border-color: #ff4b4b; }
         .tab-btn { background: transparent; color: #666; width: auto; padding: 8px 16px; font-weight: bold; border-radius: 20px; }
         .tab-btn:hover { background: #f0f2f6; }
         .tab-btn.active { background: #ff4b4b; color: white; }
@@ -63,10 +67,16 @@
     </div>
 
     <div id="main">
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('chat')">💬 Chat</button>
-            <button class="tab-btn" onclick="switchTab('files')">📁 Files</button>
-            <button class="tab-btn" onclick="switchTab('presentation')">📊 Presentation</button>
+        <div class="tabs-container">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('chat')">💬 Chat</button>
+                <button class="tab-btn" onclick="switchTab('files')">📁 Files</button>
+                <button class="tab-btn" onclick="switchTab('presentation')">📊 Presentation</button>
+            </div>
+            <div class="api-key-container">
+                <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Enter Gemini API Key..." oninput="checkApiKey()">
+                <span id="api-key-status" title="API Key Entered" style="display: none; color: green; font-size: 18px;">✅</span>
+            </div>
         </div>
 
         <div id="tab-chat" class="tab-content active">
@@ -109,6 +119,16 @@
             
             document.querySelector(`.tab-btn[onclick="switchTab('${tabName}')"]`).classList.add('active');
             document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        function checkApiKey() {
+            const input = document.getElementById('gemini-api-key');
+            const status = document.getElementById('api-key-status');
+            if (input.value.trim().length > 0) {
+                status.style.display = 'inline';
+            } else {
+                status.style.display = 'none';
+            }
         }
 
         document.getElementById('file-input').addEventListener('change', function(e) {
@@ -218,6 +238,12 @@
         });
 
         async function sendMessage() {
+            const apiKey = document.getElementById('gemini-api-key').value.trim();
+            if(!apiKey) {
+                alert("Please enter your Gemini API Key in the top right corner.");
+                return;
+            }
+
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
             if(!message || !documentText) return;
@@ -241,7 +267,8 @@
                     body: JSON.stringify({
                         document_text: documentText,
                         query: message,
-                        chat_history: chatHistory
+                        chat_history: chatHistory,
+                        api_key: apiKey
                     })
                 });
                 
@@ -275,6 +302,12 @@
         }
 
         async function generatePresentation() {
+            const apiKey = document.getElementById('gemini-api-key').value.trim();
+            if(!apiKey) {
+                alert("Please enter your Gemini API Key in the top right corner.");
+                return;
+            }
+
             if(!documentText) return;
             
             const btn = document.getElementById('generate-presentation-btn');
@@ -291,7 +324,8 @@
                     body: JSON.stringify({
                         document_text: documentText,
                         query: "", // Not needed
-                        chat_history: [] // Not needed
+                        chat_history: [], // Not needed
+                        api_key: apiKey
                     })
                 });
                 
