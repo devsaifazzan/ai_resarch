@@ -65,7 +65,7 @@ async def chat(request: ChatRequest):
         if not request.api_key:
             return JSONResponse(status_code=400, content={"error": "Gemini API Key is missing. Please provide it in the UI."})
             
-        llm = ChatGoogleGenerativeAI(temperature=0, model="gemini-1.5-flash", google_api_key=request.api_key)
+        llm = ChatGoogleGenerativeAI(temperature=0, model="gemini-1.5-flash-latest", google_api_key=request.api_key)
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful research assistant. Answer the user's questions based on the following document text. If the answer is not in the text, say you don't know.\n\nDocument Text:\n{document_text}"),
@@ -99,7 +99,7 @@ async def generate_presentation(request: ChatRequest):
         if not request.api_key:
             return JSONResponse(status_code=400, content={"error": "Gemini API Key is missing. Please provide it in the UI."})
             
-        llm = ChatGoogleGenerativeAI(temperature=0.2, model="gemini-1.5-flash", google_api_key=request.api_key)
+        llm = ChatGoogleGenerativeAI(temperature=0.2, model="gemini-1.5-flash-latest", google_api_key=request.api_key)
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", "You are an expert presentation generator. Create a structured slide-by-slide presentation summary based on the provided documents. Use clear slide numbers, titles, and bullet points. Make it well formatted.\n\nDocuments:\n{document_text}"),
