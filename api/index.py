@@ -89,7 +89,13 @@ async def chat(request: ChatRequest):
             "query": request.query
         })
         
-        return {"answer": response.content}
+        answer_content = response.content
+        if isinstance(answer_content, list):
+            answer_content = "\n".join([part.get("text", "") for part in answer_content if isinstance(part, dict) and "text" in part])
+        elif not isinstance(answer_content, str):
+            answer_content = str(answer_content)
+
+        return {"answer": answer_content}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
@@ -112,7 +118,13 @@ async def generate_presentation(request: ChatRequest):
             "document_text": request.document_text
         })
         
-        return {"presentation": response.content}
+        presentation_content = response.content
+        if isinstance(presentation_content, list):
+            presentation_content = "\n".join([part.get("text", "") for part in presentation_content if isinstance(part, dict) and "text" in part])
+        elif not isinstance(presentation_content, str):
+            presentation_content = str(presentation_content)
+            
+        return {"presentation": presentation_content}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
