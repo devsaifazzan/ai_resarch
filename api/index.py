@@ -128,6 +128,51 @@ async def generate_presentation(request: ChatRequest):
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+@app.post("/api/graph")
+async def generate_graph(request: ChatRequest):
+    try:
+        import json
+        if not request.api_key:
+            return JSONResponse(status_code=400, content={"error": "Gemini API Key is missing. Please provide it in the UI."})
+            
+        llm = ChatGoogleGenerativeAI(temperature=0.1, model="gemini-3.5-flash", google_api_key=request.api_key)
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are an expert knowledge graph extractor. Analyze the document text and extract the key entities and their relationships.\n"
+                       "Return ONLY a valid, raw JSON object with NO markdown formatting, NO backticks, and NO additional text.\n"
+                       "The JSON must have two arrays: 'nodes' and 'edges'.\n"
+                       "- 'nodes' elements must have: 'id' (unique string), 'label' (short display name), 'group' (category string like 'Concept', 'Person', 'Organization', etc.).\n"
+                       "- 'edges' elements must have: 'from' (source node id), 'to' (target node id), 'label' (relationship description).\n"
+                       "Extract the most important 15-30 nodes that summarize the core knowledge.\n"
+                       "Document Text:\n{document_text}"),
+            ("user", "Extract the knowledge graph JSON.")
+        ])
+        
+        chain = prompt | llm
+        response = chain.invoke({"document_text": request.document_text})
+        
+        graph_content = response.content
+        if isinstance(graph_content, list):
+            graph_content = "".join([part.get("text", "") for part in graph_content if isinstance(part, dict) and "text" in part])
+        elif not isinstance(graph_content, str):
+            graph_content = str(graph_content)
+            
+        # Clean up any potential markdown backticks just in case
+        graph_content = graph_content.strip()
+        if graph_content.startswith("```json"):
+            graph_content = graph_content[7:]
+        elif graph_content.startswith("```"):
+            graph_content = graph_content[3:]
+        if graph_content.endswith("```"):
+            graph_content = graph_content[:-3]
+            
+        graph_json = json.loads(graph_content.strip())
+        return graph_json
+    except json.JSONDecodeError as e:
+        return JSONResponse(status_code=500, content={"error": "Failed to parse graph JSON from AI response."})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

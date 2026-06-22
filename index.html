@@ -42,8 +42,10 @@
         
         #status { margin-top: 10px; font-size: 14px; color: #666; }
         #footer { margin-top: auto; padding-top: 20px; border-top: 1px solid #eee; font-size: 14px; color: #666; }
+        #network-graph { width: 100%; height: 500px; border: 1px solid #ccc; border-radius: 8px; background-color: #f8f9fa; margin-top: 20px; }
         a { color: #ff4b4b; text-decoration: none; }
     </style>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 </head>
 <body>
     <div id="sidebar">
@@ -72,6 +74,7 @@
                 <button class="tab-btn active" onclick="switchTab('chat')">💬 Chat</button>
                 <button class="tab-btn" onclick="switchTab('files')">📁 Files</button>
                 <button class="tab-btn" onclick="switchTab('presentation')">📊 Presentation</button>
+                <button class="tab-btn" onclick="switchTab('graph')">🕸️ Graph</button>
             </div>
             <div class="api-key-container">
                 <input type="password" id="gemini-api-key" class="api-key-input" placeholder="Enter Gemini API Key..." oninput="checkApiKey()">
@@ -106,12 +109,21 @@
             <button id="generate-presentation-btn" disabled onclick="generatePresentation()" style="max-width: 300px; margin-bottom: 20px;">Generate Presentation</button>
             <div id="presentation-content"></div>
         </div>
+
+        <div id="tab-graph" class="tab-content">
+            <h2>Interactive Knowledge Graph</h2>
+            <p style="color: #666;">Visualize relationships and key concepts from your uploaded documents (NotebookLM style).</p>
+            <button id="generate-graph-btn" disabled onclick="generateGraph()" style="max-width: 300px;">Generate Graph</button>
+            <div id="graph-status" style="margin-top: 10px; font-weight: bold;"></div>
+            <div id="network-graph"></div>
+        </div>
     </div>
 
     <script>
         let documentText = "";
         let chatHistory = [];
         let uploadedFiles = [];
+        let networkGraph = null;
 
         function switchTab(tabName) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -210,6 +222,7 @@
                     document.getElementById('chat-input').disabled = false;
                     document.getElementById('send-btn').disabled = false;
                     document.getElementById('generate-presentation-btn').disabled = false;
+                    document.getElementById('generate-graph-btn').disabled = false;
                     
                     // Reset chat
                     chatHistory = [];
@@ -349,6 +362,86 @@
             const fileURL = URL.createObjectURL(file);
             document.getElementById('file-viewer-container').style.display = 'flex';
             document.getElementById('file-viewer').src = fileURL;
+        }
+
+        async function generateGraph() {
+            const apiKey = document.getElementById('gemini-api-key').value.trim();
+            if(!apiKey) {
+                alert("Please enter your Gemini API Key in the top right corner.");
+                return;
+            }
+
+            if(!documentText) return;
+            
+            const btn = document.getElementById('generate-graph-btn');
+            const status = document.getElementById('graph-status');
+            const container = document.getElementById('network-graph');
+            
+            btn.disabled = true;
+            btn.innerText = "Analyzing documents...";
+            status.innerHTML = '<span style="color:orange;">Extracting concepts and relationships... This may take a minute.</span>';
+            
+            try {
+                const response = await fetch('/api/graph', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        document_text: documentText,
+                        query: "",
+                        chat_history: [],
+                        api_key: apiKey
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if(response.ok) {
+                    status.innerHTML = '<span style="color:green;">Graph generated successfully! Drag nodes to explore.</span>';
+                    
+                    const nodes = new vis.DataSet(data.nodes);
+                    const edges = new vis.DataSet(data.edges);
+                    
+                    const graphData = { nodes: nodes, edges: edges };
+                    const options = {
+                        nodes: {
+                            shape: 'dot',
+                            size: 20,
+                            font: { size: 14, color: '#333' },
+                            borderWidth: 2
+                        },
+                        edges: {
+                            width: 2,
+                            font: { size: 12, align: 'middle' },
+                            arrows: { to: { enabled: true, scaleFactor: 0.5 } }
+                        },
+                        physics: {
+                            forceAtlas2Based: {
+                                gravitationalConstant: -26,
+                                centralGravity: 0.005,
+                                springLength: 230,
+                                springConstant: 0.18
+                            },
+                            maxVelocity: 146,
+                            solver: 'forceAtlas2Based',
+                            timestep: 0.35,
+                            stabilization: { iterations: 150 }
+                        }
+                    };
+                    
+                    if (networkGraph !== null) {
+                        networkGraph.destroy();
+                    }
+                    networkGraph = new vis.Network(container, graphData, options);
+                    
+                } else {
+                    status.innerHTML = '<span style="color:red;">Error: ' + data.error + '</span>';
+                }
+            } catch(err) {
+                status.innerHTML = '<span style="color:red;">Error: ' + err.message + '</span>';
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Regenerate Graph";
+            }
         }
     </script>
 </body>
