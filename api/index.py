@@ -108,8 +108,13 @@ async def generate_presentation(request: ChatRequest):
         llm = ChatGoogleGenerativeAI(temperature=0.2, model="gemini-3.5-flash", google_api_key=request.api_key)
         
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an expert presentation generator. Create a structured slide-by-slide presentation summary based on the provided documents. Use clear slide numbers, titles, and bullet points. Make it well formatted.\n\nDocuments:\n{document_text}"),
-            ("user", "Please generate a presentation based on the uploaded files.")
+            ("system", "You are an expert presentation generator. Create a structured slide-by-slide presentation summary based on the provided documents.\n"
+                       "Return ONLY a valid, raw JSON object with NO markdown formatting, NO backticks, and NO additional text.\n"
+                       "The JSON must have a single key 'slides', which is an array of objects.\n"
+                       "Each slide object must have: 'title' (string), 'subtitle' (string, optional), and 'bullets' (array of strings).\n"
+                       "Keep the presentation professional, concise, and structured (around 5 to 10 slides).\n"
+                       "Document Text:\n{document_text}"),
+            ("user", "Extract the presentation JSON.")
         ])
         
         chain = prompt | llm
@@ -120,11 +125,23 @@ async def generate_presentation(request: ChatRequest):
         
         presentation_content = response.content
         if isinstance(presentation_content, list):
-            presentation_content = "\n".join([part.get("text", "") for part in presentation_content if isinstance(part, dict) and "text" in part])
+            presentation_content = "".join([part.get("text", "") for part in presentation_content if isinstance(part, dict) and "text" in part])
         elif not isinstance(presentation_content, str):
             presentation_content = str(presentation_content)
             
-        return {"presentation": presentation_content}
+        presentation_content = presentation_content.strip()
+        if presentation_content.startswith("```json"):
+            presentation_content = presentation_content[7:]
+        elif presentation_content.startswith("```"):
+            presentation_content = presentation_content[3:]
+        if presentation_content.endswith("```"):
+            presentation_content = presentation_content[:-3]
+            
+        try:
+            presentation_json = json.loads(presentation_content.strip())
+            return {"presentation": presentation_json}
+        except json.JSONDecodeError:
+            return JSONResponse(status_code=500, content={"error": "Failed to parse presentation JSON from AI response."})
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
